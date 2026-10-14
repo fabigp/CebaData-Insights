@@ -88,4 +88,88 @@ modelo_gpr.fit(X_train_scaled, y_train)
 # Al poner return_std=True obtenemos la estimación y el riesgo asociado
 predicciones_rendimiento, incertidumbre = modelo_gpr.predict(X_test_scaled, return_std=True)
 
+# Modelos Lineales Regularizados (Ridge, Lasso, ElasticNet) y PLS
+
+### 1. Descripción Teórica y Fundamentos
+
+Los cuatro son regresiones lineales adaptadas para cuando hay **muchas variables, muy parecidas entre sí, y pocos datos**. Es justo el caso del reto: 217 variables satelitales para 138 parcelas. Una regresión lineal normal, con más variables que parcelas, tiene infinitas soluciones y sus coeficientes se disparan cuando las variables se parecen (NDVI, EVI y SAVI de agosto se mueven casi juntos). Estos modelos lo evitan de dos formas: castigando los coeficientes grandes (Ridge, Lasso, ElasticNet) o resumiendo las variables en pocos componentes (PLS).
+
+* **Ridge:** Agrega una penalización a la suma de los coeficientes al cuadrado (L2). Encoge todos los coeficientes hacia cero sin eliminar ninguno, y reparte el peso entre variables parecidas, por lo que es muy estable. Parámetro: `alpha`.
+* **Lasso:** Agrega una penalización a la suma de los valores absolutos de los coeficientes (L1). Deja muchos coeficientes en cero exacto, es decir, **selecciona variables** automáticamente. De un grupo de variables muy parecidas suele quedarse con una casi al azar. Parámetro: `alpha`.
+* **ElasticNet:** Combina L1 y L2. Selecciona variables como Lasso, pero conserva grupos de variables correlacionadas como Ridge. Parámetros: `alpha` y `l1_ratio` (0 = Ridge puro, 1 = Lasso puro).
+* **PLS (Mínimos Cuadrados Parciales):** No castiga coeficientes; construye unos pocos **componentes** (combinaciones de las variables) elegidos para relacionarse lo más posible con el rendimiento, y hace la regresión sobre ellos. Se parece a PCA, pero PCA no mira el rendimiento y PLS sí. Es muy usado en espectroscopía e índices de vegetación. Parámetro: número de componentes.
+
+### 2. Factibilidad y Alineación con el Reto AgroCebada 2026
+
+**Factibilidad: Media-Alta. ElasticNet es el mejor candidato de los cuatro, pero con los datos satelitales actuales no supera a predecir el promedio del municipio de cada parcela.**
+
+* **Eficacia en Datasets Pequeños:** Funcionan bien con 138 parcelas y no se sobreajustan tanto como los modelos de árboles.
+* **Interpretabilidad:** Cada variable tiene un coeficiente con signo, lo que permite responder directamente *"¿Qué índice es más importante en la predicción?"*.
+* **Limitación:** Suponen relaciones lineales; no detectan por sí solos efectos como "el NDVI alto solo ayuda si llovió".
+
+**Resultados de la prueba con el dataset (validación cruzada, 138 parcelas):**
+
+| Modelo | Variables | Error (t/ha) | R² | Acierto % |
+|---|---|---|---|---|
+| Promedio del municipio (referencia) | — | 0.51 | 0.64 | 90.4 |
+| ElasticNet | Satélite + lat/lon | 0.56 | 0.56 | 88.3 |
+| Lasso | Satélite + lat/lon | 0.56 | 0.56 | 88.4 |
+| Ridge | Satélite + lat/lon | 0.60 | 0.50 | 87.3 |
+| PLS | Satélite + lat/lon | 0.64 | 0.43 | 86.2 |
+
+* **Por municipio:** ningún modelo supera al promedio del municipio en Chignahuapan, Calpulalpan, Singuilucan, Almoloya ni Cuautepec de Hinojosa.
+* **Municipio desconocido:** si se entrena sin un municipio y se predice ese municipio completo, los cuatro fallan por alrededor de 1 t/ha (excepto Almoloya).
+* **Dentro de Chignahuapan:** R² cercano a 0; el satélite no distingue parcelas buenas de malas dentro de un mismo municipio.
+* **Variables con más peso:** índices de junio y de rastrojo/labranza (CRC, NDTI, STI), LAI de octubre y MSI de noviembre. Reflejan más la zona y el manejo que el vigor del cultivo.
+
+![Error por modelo](img/prueba_lineales_rmse.png)
+
+
+### 3. Prompts Utilizados en la Investigación
+
+| # | Prompt (resumen) | Qué se hizo | Resultado principal |
+|---|---|---|---|
+| 1 | Hacer una prueba de los datos enfocada en Ridge/Lasso/ElasticNet y PLS, explicando qué se probó, cómo y en qué municipios | Se construyeron 217 variables satelitales por parcela (jun–nov 2025) y se evaluaron los cuatro modelos con tres pruebas de validación | Ningún modelo supera al promedio del municipio (0.51 t/ha); el mejor es ElasticNet con lat/lon (0.56 t/ha) |
+| 2 | Quedarse solo con los resultados de Ridge, Lasso y ElasticNet | Se filtraron y guardaron los resultados | Tablas de error por prueba y por municipio |
+| 5 | Hacer el documento de Ridge, Lasso, ElasticNet y PLS | Se recalcularon las pruebas con las medidas de acierto y se redactó el documento | Esta sección |
+| 7 | Probar "promedio del municipio + modelo" con todos los modelos | Cada modelo predice solo la diferencia de cada parcela contra el promedio de su municipio | Ninguno mejora al promedio solo; Lasso deja todos los coeficientes en cero |
+
+# Prueba Práctica de LightGBM con el Dataset del Reto
+
+### 1. Descripción Teórica y Fundamentos
+
+LightGBM construye cientos de árboles de decisión pequeños, uno tras otro; cada árbol nuevo predice el error que dejaron los anteriores y se suma a la predicción con un peso pequeño (tasa de aprendizaje).
+
+* **Histogramas:** agrupa cada variable en unos 255 rangos, por lo que entrena muy rápido.
+* **Crecimiento por hoja (*leaf-wise*):** divide primero la rama donde más baja el error; es más preciso, pero con pocos datos tiende a memorizar.
+* **Datos faltantes:** los maneja sin rellenarlos (útil con huecos por nubes).
+* **Usos típicos:** datos tabulares con miles o millones de registros (ventas, riesgo crediticio, fraude, rendimiento agrícola con muchos pixeles).
+
+### 2. Factibilidad y Alineación con el Reto AgroCebada 2026
+
+**Factibilidad: Baja como modelo principal con los datos actuales; útil como complemento.**
+
+| Modelo | Variables | Error (t/ha) | R² | Acierto % |
+|---|---|---|---|---|
+| Promedio del municipio (referencia) | — | 0.51 | 0.64 | 90.4 |
+| ElasticNet (comparación) | Satélite + lat/lon | 0.56 | 0.56 | 88.3 |
+| LightGBM | Solo satélite | 0.70 | 0.31 | 85.3 |
+| LightGBM | Satélite + lat/lon | 0.57 | 0.55 | 88.4 |
+| Promedio municipio + LightGBM | Satélite + lat/lon | 0.56 | 0.56 | 88.6 |
+
+* **Sobreajuste:** con 138 parcelas y 217 variables no tiene suficientes ejemplos; dentro de Chignahuapan obtuvo R² de −0.46, peor que predecir el promedio.
+* **Municipio desconocido:** falla por alrededor de 1 t/ha (por ejemplo, predice 4.00 t/ha para Calpulalpan, cuyo real es 3.00).
+* **Importancia de variables:** la longitud pesa ocho veces más que cualquier índice satelital (0.64 contra 0.08 de ENDWI de julio); el modelo aprende sobre todo *dónde* está la parcela.
+* **Cuándo sí convendría:** al agregar clima (CHIRPS, CHIRTS) y topografía (elevación, pendiente), reduciendo a 20–30 variables, o en un ensamble con ElasticNet.
+
+![Error por modelo](img/prueba_lightgbm_rmse.png)
+
+### 3. Prompts Utilizados en la Investigación
+
+| # | Prompt (resumen) | Qué se hizo | Resultado principal |
+|---|---|---|---|
+| 3 | Explicar qué es LightGBM, en qué se enfoca y sus usos; probarlo con los datos, analizar si es factible, porcentaje de acierto, métodos y regiones | Explicación del modelo y prueba con tres validaciones; se agregó la medida de acierto % | LightGBM acierta 88.4%, empata con ElasticNet y queda debajo del promedio del municipio (90.4%) |
+| 4 | Generar un documento que explique la prueba de LightGBM | Se redactó el documento de LightGBM | Esta sección |
+| 7 | Probar "promedio del municipio + modelo" con todos los modelos | LightGBM predice solo la diferencia de cada parcela contra el promedio de su municipio | Empeora el resultado: 88.6% contra 90.4% del promedio solo |
+
 ```
