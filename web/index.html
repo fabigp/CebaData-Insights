@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CebaData Insights</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --color_prin:#245e25; --color_sec:#759e76; --color_ter:#c8beb0;
+  --white:rgb(241,237,218); --card:#faf7ec; --ink:#1d2a1d; --muted:#5b6658; --line:#d9d1c1;
+  --bajo:#c9a227; --alto:#245e25; --norte:#245e25; --sur:#b07d2b;
+}
+*{font-family:"Roboto Mono",monospace;}
+html{scroll-behavior:smooth; scroll-padding-top:76px;}
+body{background:var(--white); color:var(--ink); margin:0; overflow-x:hidden;}
+a{text-decoration:none;}
+
+/* ---------- Encabezado ---------- */
+.header{position:fixed; top:0; left:0; right:0; z-index:1100; background:var(--color_prin);}
+.nav-bar{height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 1em;}
+.header-logo{display:flex; align-items:center; gap:.5em;}
+.logo{max-height:40px;}
+.logo-h1{font-size:1.5em; color:var(--white); margin:0; font-weight:700;}
+.nav-links{display:flex; gap:.25em;}
+.nav-links a{color:var(--white); padding:.5em .8em; border-radius:8px; font-size:.9em;}
+.nav-links a:hover,.nav-links a.activo{background:rgba(241,237,218,.15);}
+.btn-menu{display:none; background:none; border:1px solid rgba(241,237,218,.35); border-radius:8px; color:var(--white); padding:.3em .7em; font-size:1.2em;}
+.menu-movil{display:none; background:var(--color_prin); padding:.5em 1em 1em;}
+.menu-movil a{display:block; color:var(--white); padding:.6em .4em;}
+.menu-movil.abierto{display:block;}
+@media (max-width:1000px){ .nav-links{display:none;} .btn-menu{display:block;} .logo-h1{font-size:1.2em;} }
+
+/* ---------- Secciones ---------- */
+section{padding:5em 1.5em 2em; max-width:1300px; margin:0 auto;}
+.titulo{color:var(--color_prin); font-weight:700; font-size:1.7em; margin-bottom:.3em;}
+.subtitulo{color:var(--muted); max-width:780px; margin-bottom:1.5em;}
+.card-c{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:1.25em; min-width:0;}
+.etiqueta{font-size:.8em; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+
+/* Inicio */
+#inicio{padding-top:7em;}
+.hero{display:flex; flex-wrap:wrap; gap:2em; align-items:center;}
+.hero-img{max-width:620px; width:100%; border-radius:0 50px 50px 0; margin-left:-1.5em; object-fit:cover;}
+.hero-txt{flex:1; min-width:280px; display:flex; flex-direction:column; gap:1.2em;}
+.hero-txt h1{color:var(--color_prin); font-size:2.2em; font-weight:700; margin:0;}
+.btn-c{background:var(--color_prin); color:var(--white); border:none; border-radius:10px; padding:.7em 1.2em; display:inline-block;}
+.btn-c:hover{background:#1b471c; color:var(--white);}
+.btn-c.sec{background:transparent; color:var(--color_prin); border:1.5px solid var(--color_prin);}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1em; margin-top:2.5em;}
+.kpi .valor{font-size:2em; font-weight:700; color:var(--color_prin); line-height:1.1;}
+
+/* Mapa */
+.mapa-wrap{display:grid; grid-template-columns:290px 1fr; gap:1em;}
+#mapa{height:560px; border-radius:18px; border:1px solid var(--line);}
+.panel label{font-size:.85em; color:var(--muted); margin-top:.8em; display:block;}
+.panel select{width:100%; padding:.45em; border-radius:8px; border:1px solid var(--line); background:#fff;}
+.seg{display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:.3em;}
+.seg button{flex:1; border:none; background:#fff; padding:.45em .2em; font-size:.8em; color:var(--ink);}
+.seg button.on{background:var(--color_prin); color:var(--white);}
+.leyenda-barra{height:12px; border-radius:6px; background:linear-gradient(90deg,var(--bajo),#8fa84a,var(--alto)); margin:.4em 0 .2em;}
+.leyenda-num{display:flex; justify-content:space-between; font-size:.75em; color:var(--muted);}
+.resumen-mapa{font-size:.85em; margin-top:1em; line-height:1.6;}
+.leaflet-popup-content{font-family:"Roboto Mono",monospace; font-size:12.5px;}
+.leaflet-popup-content b{color:var(--color_prin);}
+.popup-btn{margin-top:.5em; display:inline-block; background:var(--color_prin); color:#fff !important; padding:.3em .6em; border-radius:6px; cursor:pointer;}
+.popup-tabla td{padding:1px 6px 1px 0;}
+@media (max-width:900px){ .mapa-wrap{grid-template-columns:1fr;} #mapa{height:420px;} }
+
+/* Explorador */
+.expl{display:grid; grid-template-columns:1fr 2fr; gap:1em;}
+.ficha dl{display:grid; grid-template-columns:auto 1fr; gap:.4em 1em; margin:0; font-size:.9em;}
+.ficha dt{color:var(--muted); font-weight:400;}
+.ficha dd{margin:0; font-weight:500;}
+.grande{font-size:2.2em; font-weight:700; color:var(--color_prin);}
+@media (max-width:900px){ .expl{grid-template-columns:1fr;} }
+
+/* Rango (intervalo) dibujado con HTML */
+.rango{position:relative; height:26px; margin:.6em 0 .2em;}
+.rango .eje{position:absolute; left:0; right:0; top:12px; height:2px; background:var(--line);}
+.rango .banda{position:absolute; top:6px; height:14px; border-radius:7px; background:rgba(36,94,37,.25);}
+.rango .punto{position:absolute; top:3px; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:var(--color_prin); border:3px solid #fff; box-shadow:0 0 0 1px var(--color_prin);}
+.rango .qrf{position:absolute; top:6px; width:14px; height:14px; margin-left:-7px; border-radius:3px; border:2px solid #8a6d1f; background:#fff; transform:rotate(45deg);}
+.rango-num{display:flex; justify-content:space-between; font-size:.75em; color:var(--muted);}
+
+/* Tres criterios */
+.criterios{display:grid; grid-template-columns:repeat(4,1fr); gap:1em; margin-bottom:1em;}
+.criterio .num{font-size:.75em; background:var(--color_prin); color:var(--white); border-radius:6px; padding:.1em .45em; margin-right:.4em;}
+.criterio h3{font-size:1em; font-weight:700; color:var(--color_prin); margin:.6em 0 .4em;}
+.criterio p{font-size:.82em; margin:0; color:var(--ink);}
+.criterio.sintesis{background:var(--color_prin); color:var(--white); border-color:var(--color_prin);}
+.criterio.sintesis h3,.criterio.sintesis p{color:var(--white);}
+.mini-tabla{width:100%; font-size:.85em; margin-top:.6em;}
+.mini-tabla td{padding:.3em 0; border-bottom:1px solid #eee7d6;}
+.mini-tabla td:last-child{text-align:right; font-weight:500;}
+.porque{font-size:.82em; margin-top:.4em;}
+.porque .fila{display:grid; grid-template-columns:8.5em 1fr 3.6em; align-items:center; gap:.5em; padding:.15em 0;}
+.porque .barra-c{position:relative; height:12px; background:#efe9d9; border-radius:3px;}
+.porque .barra-c .centro{position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--muted);}
+.porque .barra-c .b{position:absolute; top:0; bottom:0; border-radius:3px;}
+.porque .val{text-align:right; font-weight:500;}
+.pill{display:inline-block; font-size:.75em; border-radius:999px; padding:.1em .6em; border:1px solid var(--line); background:#fff;}
+.pill.si{border-color:var(--color_prin); color:var(--color_prin);}
+.pill.no{border-color:#8a6d1f; color:#8a6d1f;}
+.cat-Alto{color:var(--alto);} .cat-Medio{color:#6f8a3a;} .cat-Bajo{color:#8a6d1f;}
+@media (max-width:1100px){ .criterios{grid-template-columns:1fr 1fr;} }
+@media (max-width:600px){ .criterios{grid-template-columns:1fr;} }
+
+/* Tabla */
+.tabla-wrap{max-height:460px; overflow:auto; border-radius:12px; border:1px solid var(--line);}
+table.t{width:100%; border-collapse:collapse; font-size:.85em; background:#fff;}
+table.t th{position:sticky; top:0; background:var(--color_prin); color:var(--white); padding:.6em; cursor:pointer; white-space:nowrap; font-weight:500;}
+table.t td{padding:.5em .6em; border-bottom:1px solid #eee7d6; white-space:nowrap;}
+table.t tr:hover td{background:#f4f0e2; cursor:pointer;}
+.chip{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle;}
+.dos{display:grid; grid-template-columns:3fr 2fr; gap:1em;}
+.dos-igual{display:grid; grid-template-columns:1fr 1fr; gap:1em;}
+.tres{display:grid; grid-template-columns:repeat(3,1fr); gap:1em;}
+@media (max-width:1100px){ .tres{grid-template-columns:1fr;} }
+@media (max-width:900px){ .dos,.dos-igual{grid-template-columns:1fr;} }
+.buscador{padding:.45em .7em; border:1px solid var(--line); border-radius:8px; width:100%; max-width:320px;}
+.nota{font-size:.8em; color:var(--muted); margin-top:.6em;}
+.conclusion{border-left:4px solid var(--color_prin); padding:.8em 1em; background:var(--card); border-radius:0 12px 12px 0;}
+
+/* Preguntas bonus */
+.pregunta h3{font-size:1.05em; font-weight:700; color:var(--color_prin); margin:0 0 .6em;}
+.respuesta{background:#fff; border:1px solid var(--line); border-left:4px solid var(--color_prin); border-radius:0 10px 10px 0; padding:.7em .9em; font-size:.85em; margin-bottom:1em;}
+.respuesta .r{font-weight:700; font-size:1.05em; color:var(--color_prin); display:block; margin-bottom:.3em;}
+footer{background:var(--color_prin); color:var(--white); text-align:center; padding:1.5em; margin-top:3em; font-size:.85em;}
+</style>
+</head>
+<body>
+
+<!-- ================= ENCABEZADO ================= -->
+<div class="header">
+  <div class="nav-bar">
+    <a href="#inicio" class="header-logo">
+      <img class="logo" src="../img/cebadito.png" alt="logo">
+      <h1 class="logo-h1">CebaData Insights</h1>
+    </a>
+    <nav class="nav-links">
+      <a href="#inicio">Inicio</a><a href="#mapa-sec">Mapa de Parcelas</a><a href="#explorador">Explorador</a>
+      <a href="#predicciones">Predicciones</a><a href="#analisis">Análisis</a><a href="#bonus">Bonus</a>
+    </nav>
+    <button class="btn-menu" id="btnMenu" aria-label="Abrir menú">☰</button>
+  </div>
+  <div class="menu-movil" id="menuMovil">
+    <a href="#inicio">Inicio</a><a href="#mapa-sec">Mapa de Parcelas</a><a href="#explorador">Explorador Parcelas</a>
+    <a href="#predicciones">Predicciones</a><a href="#analisis">Análisis</a><a href="#bonus">Preguntas bonus</a>
+  </div>
+</div>
+
+<!-- ================= INICIO ================= -->
+<section id="inicio">
+  <div class="hero">
+    <img class="hero-img" src="../img/cebada2.png" alt="Campo de cebada">
+    <div class="hero-txt">
+      <h1>CebaData Insights</h1>
+      <p class="mb-0">Estimamos el rendimiento de cebada de temporal en 197 parcelas del Altiplano central (Hidalgo, Puebla y Tlaxcala),
+        el corazón cebadero del país, con información pública: imágenes satelitales (Sentinel-2, Landsat y Planet),
+        clima, relieve y suelo. Nuestro modelo predice con un error esperado de <b id="heroRmse"></b> t/ha
+        (<span id="heroRel"></span>% del rendimiento promedio) y acompaña cada predicción con un rango probable.</p>
+      <p class="mb-0">Anticipar la cosecha ayuda a FIRA y a los intermediarios financieros a evaluar el riesgo de crédito y de seguro
+        de productores que hoy casi no tienen acceso a financiamiento. Explora cada parcela en el mapa, revisa cómo creció
+        el cultivo y consulta las predicciones para las 59 parcelas del reto.</p>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn-c" href="#mapa-sec">Ver mapa</a>
+        <a class="btn-c sec" href="#predicciones">Ver predicciones</a>
+      </div>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+</section>
+
+<!-- ================= MAPA ================= -->
+<section id="mapa-sec">
+  <h2 class="titulo">Mapa de Parcelas</h2>
+  <p class="subtitulo">Cada polígono es una parcela, coloreada por su rendimiento. Se distinguen dos zonas: el norte
+    (Chignahuapan, Almoloya, Cuautepec) promedia <span id="txtNorte"></span> t/ha y el sur (Calpulalpan, Singuilucan y vecinos),
+    <span id="txtSur"></span> t/ha. Haz clic en una parcela para ver su detalle.</p>
+  <div class="mapa-wrap">
+    <div class="card-c panel">
+      <span class="etiqueta">Mostrar</span>
+      <div class="seg" id="segConjunto">
+        <button data-v="todas" class="on">Todas</button>
+        <button data-v="ENTRENAMIENTO">Real</button>
+        <button data-v="PREDICCION">Predicción</button>
+      </div>
+      <label for="selCriterio">Criterio para las parcelas a predecir</label>
+      <select id="selCriterio">
+        <option value="prediccion">Predicción oficial</option>
+        <option value="int_inf">Escenario prudente (límite inferior 80%)</option>
+        <option value="int_sup">Escenario favorable (límite superior 80%)</option>
+        <option value="qrf_mediana">Segunda opinión (QRF)</option>
+      </select>
+      <label for="selMun">Municipio</label>
+      <select id="selMun"><option value="">Todos los municipios</option></select>
+      <label>Rendimiento (t/ha)</label>
+      <div class="leyenda-barra"></div>
+      <div class="leyenda-num"><span id="legMin"></span><span id="legMid"></span><span id="legMax"></span></div>
+      <div class="nota">Borde continuo: rendimiento real · borde punteado: predicción</div>
+      <div class="resumen-mapa" id="resumenMapa"></div>
+    </div>
+    <div id="mapa"></div>
+  </div>
+</section>
+
+<!-- ================= EXPLORADOR ================= -->
+<section id="explorador">
+  <h2 class="titulo">Explorador de Parcelas</h2>
+  <p class="subtitulo">Elige una parcela para ver su curva de NDVI en 2025 contra el promedio de su municipio. El NDVI mide qué tan verde y vigoroso está el cultivo.
+    En las parcelas a predecir verás los tres criterios y por qué el modelo llegó a ese número; en las de entrenamiento,
+    qué habría predicho el modelo sin conocer su rendimiento.</p>
+  <div class="expl">
+    <div class="card-c ficha">
+      <label for="selParcela" class="etiqueta">Parcela</label>
+      <select id="selParcela" class="form-select mb-3"></select>
+      <div class="etiqueta" id="fichaTipo"></div>
+      <div class="grande" id="fichaRend"></div>
+      <div id="fichaExtra"></div>
+      <dl class="mt-3" id="fichaDatos"></dl>
+    </div>
+    <div class="card-c">
+      <div class="etiqueta mb-2">NDVI mensual 2025 (Sentinel-2, nubosidad ≤ 10%)</div>
+      <div style="height:340px"><canvas id="chNdvi"></canvas></div>
+      <div class="nota" id="notaNdvi"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PREDICCIONES ================= -->
+<section id="predicciones">
+  <h2 class="titulo">Predicciones</h2>
+  <p class="subtitulo">Rendimiento estimado para las 59 parcelas del conjunto de PREDICCIÓN, visto con tres criterios
+    que se resumen en una lectura para crédito.</p>
+  <div class="criterios" id="criterios"></div>
+  <div class="dos">
+    <div class="card-c">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <input class="buscador" id="buscar" placeholder="Buscar ID o municipio…">
+        <button class="btn-c" id="btnCsv">Descargar CSV</button>
+      </div>
+      <div class="tabla-wrap"><table class="t" id="tablaPred"><thead><tr>
+        <th data-k="id">ID ↕</th><th data-k="municipio">Municipio ↕</th><th data-k="area">Área (ha) ↕</th>
+        <th data-k="prediccion">Predicción ↕</th><th data-k="int_inf">Rango 80% ↕</th><th data-k="qrf_mediana">QRF ↕</th>
+        <th data-k="categoria">Categoría ↕</th><th data-k="prod">Producción (t) ↕</th></tr></thead><tbody></tbody></table></div>
+      <div class="nota">Valores en t/ha. Haz clic en una fila para verla en el mapa. Producción = predicción × área.<br>
+        Uso responsable: el modelo no ve el manejo de cada productor; úsalo para priorizar y monitorear, no como único criterio para negar un crédito.</div>
+    </div>
+    <div class="card-c">
+      <div class="etiqueta mb-2">Predicción y rango del 80% de cada parcela (ordenadas)</div>
+      <div style="height:400px"><canvas id="chRangos"></canvas></div>
+      <div class="nota">Barra: rango probable · círculo: predicción oficial · rombo: segunda opinión (QRF).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ANÁLISIS ================= -->
+<section id="analisis">
+  <h2 class="titulo">Análisis</h2>
+  <p class="subtitulo">Siguiendo CRISP-DM, probamos más de 170 variables, cuatro fuentes externas y 11 familias de modelos
+    (lineales, árboles, GPR, QRF y ensambles) con validación cruzada repetida 5 × 10 sobre las 138 parcelas con rendimiento conocido.
+    Ningún modelo complejo superó de forma comprobada a una regresión lineal de tres variables.</p>
+  <div class="dos-igual">
+    <div class="card-c">
+      <div class="etiqueta mb-2">Error típico por modelo con las mismas 3 variables (RMSE, t/ha · más corto es mejor)</div>
+      <div style="height:320px"><canvas id="chModelos"></canvas></div>
+      <div class="nota" id="notaModelos"></div>
+    </div>
+    <div class="card-c">
+      <div class="etiqueta mb-2">Cuánto empeora el error si se quita cada variable del modelo final (t/ha)</div>
+      <div style="height:320px"><canvas id="chImp"></canvas></div>
+      <div class="nota" id="notaImp"></div>
+    </div>
+  </div>
+  <div class="dos-igual mt-3">
+    <div class="card-c">
+      <div class="etiqueta mb-2">Rendimiento real por municipio (parcelas de entrenamiento)</div>
+      <div style="height:300px"><canvas id="chReal"></canvas></div>
+      <div class="nota">En el sur casi todos los rendimientos vienen redondeados a 0.5 t/ha; en el norte, con dos decimales.
+        Esto sugiere fuentes de medición distintas.</div>
+    </div>
+    <div class="conclusion">
+      <b>Qué encontramos</b>
+      <ul class="mt-2 mb-0" style="padding-left:1.1em" id="conclusiones"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PREGUNTAS BONUS ================= -->
+<section id="bonus">
+  <h2 class="titulo">Preguntas bonus</h2>
+  <p class="subtitulo">Cada respuesta usa las mismas 50 particiones del modelo final. Para cada variable medimos qué tanto la elige
+    Lasso cuando compite contra <span id="nCand"></span> variables y cuánto baja el error al sumarla a la zona y el área.
+    Solo llamamos <i>comprobada</i> a una mejora con p &lt; 0.05.</p>
+  <div class="tres">
+    <div class="card-c pregunta">
+      <h3>1. ¿Qué índice es el más importante?</h3>
+      <div class="respuesta" id="respIndice"></div>
+      <div class="etiqueta mb-1">% de particiones en que Lasso lo elige</div>
+      <div style="height:320px"><canvas id="chBonusIdx"></canvas></div>
+    </div>
+    <div class="card-c pregunta">
+      <h3>2. ¿Qué variable climática influye más?</h3>
+      <div class="respuesta" id="respClima"></div>
+      <div class="etiqueta mb-1">Lo que explica sola vs. lo que agrega a zona + área (R²)</div>
+      <div style="height:320px"><canvas id="chBonusClima"></canvas></div>
+      <div class="nota" id="notaClima"></div>
+    </div>
+    <div class="card-c pregunta">
+      <h3>3. ¿Qué combinación de variables es la mejor?</h3>
+      <div class="respuesta" id="respComb"></div>
+      <div class="etiqueta mb-1">Error típico de cada combinación (RMSE, t/ha)</div>
+      <div style="height:320px"><canvas id="chBonusComb"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<footer>CebaData Insights · Reto AgroCebada 2026 (FIRA) · <span id="pieGenerado"></span></footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="datos_parcelas.js"></script>
+<script>
+/* Todos los números vienen de datos_parcelas.js, generado por run_fase3.py. */
+const D = window.CEBA_DATA, F = D.features, P = F.map(f => f.properties);
+const MET = D.metricas, INT = D.intervalo, QRF = D.intervalo.qrf, MOD = D.modelo, BON = D.bonus;
+const VERDE = '#245e25', SEC = '#759e76', TER = '#c8beb0', MUTED = '#5b6658', OCRE = '#b07d2b';
+const fmt = (v, d = 2) => v == null ? '—' : v.toFixed(d);
+const fmtP = p => p == null ? '—' : (p < 0.001 ? '< 0.001' : p.toFixed(2));
+const signo = (v, d = 2) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+Chart.defaults.font.family = '"Roboto Mono", monospace'; Chart.defaults.color = MUTED;
+const $ = id => document.getElementById(id);
+
+/* criterio elegido para colorear las parcelas a predecir */
+let criterio = 'prediccion';
+const NOMBRE_CRIT = { prediccion: 'Predicción oficial', int_inf: 'Escenario prudente', int_sup: 'Escenario favorable', qrf_mediana: 'Segunda opinión (QRF)' };
+const valor = p => p.conjunto === 'PREDICCION' ? p[criterio] : p.rendimiento;
+
+/* ---------- Menú móvil ---------- */
+const menu = $('menuMovil');
+$('btnMenu').onclick = () => menu.classList.toggle('abierto');
+menu.querySelectorAll('a').forEach(a => a.onclick = () => menu.classList.remove('abierto'));
+
+/* ---------- Textos y KPIs ---------- */
+const ent = P.filter(p => p.conjunto === 'ENTRENAMIENTO'), pre = P.filter(p => p.conjunto === 'PREDICCION');
+const munis = [...new Set(P.map(p => p.municipio))].sort();
+const prom = a => a.reduce((s, v) => s + v, 0) / a.length;
+const promZona = z => prom(ent.filter(p => p.zona === z).map(p => p.rendimiento));
+$('heroRmse').textContent = fmt(MET.rmse); $('heroRel').textContent = Math.round(MET.rmse_rel);
+$('txtNorte').textContent = fmt(promZona('Norte'), 1); $('txtSur').textContent = fmt(promZona('Sur'), 1);
+$('pieGenerado').textContent = 'datos generados ' + D.meta.generado;
+const kpis = [
+  ['Parcelas', P.length, `${ent.length} con rendimiento · ${pre.length} a predecir`],
+  ['Municipios', munis.length, 'Hidalgo, Puebla y Tlaxcala'],
+  ['Rendimiento promedio', fmt(MET.promedio_entrenamiento) + ' t/ha', 'Ciclo abril–octubre 2025'],
+  ['Error del modelo', fmt(MET.rmse) + ' t/ha', `R² ${fmt(MET.r2)} · ${Math.round(MET.pct_05)}% de predicciones a ±0.5 t/ha`],
+  ['Rango del 80%', `±${fmt(INT.ancho / 2)} t/ha`, `Contiene el valor real en ${Math.round(INT.cobertura)}% de los casos validados`],
+];
+$('kpis').innerHTML = kpis.map(k =>
+  `<div class="card-c kpi"><div class="etiqueta">${k[0]}</div><div class="valor">${k[1]}</div><div class="nota">${k[2]}</div></div>`).join('');
+
+/* ---------- Escala de color (fija para todos los criterios) ---------- */
+const todos = [...ent.map(p => p.rendimiento), ...pre.flatMap(p => [p.int_inf, p.int_sup, p.qrf_mediana])];
+const vMin = Math.min(...todos), vMax = Math.max(...todos);
+function mezcla(a, b, t) { const h = s => [1,3,5].map(i => parseInt(s.slice(i, i+2), 16)); const A = h(a), B = h(b);
+  return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, '0')).join(''); }
+function color(v) { const t = Math.max(0, Math.min(1, (v - vMin) / (vMax - vMin)));
+  return t < .5 ? mezcla('#c9a227', '#8fa84a', t * 2) : mezcla('#8fa84a', '#245e25', (t - .5) * 2); }
+$('legMin').textContent = fmt(vMin, 1); $('legMid').textContent = fmt((vMin + vMax) / 2, 1); $('legMax').textContent = fmt(vMax, 1);
+
+/* ---------- Mapa ---------- */
+const mapa = L.map('mapa', { scrollWheelZoom: false });
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom: 19, attribution: 'Imágenes © Esri' }).addTo(mapa);
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+L.control.layers({ 'Satélite': sat, 'Calles': osm }).addTo(mapa);
+
+function popupHtml(p) {
+  const cab = `<b>${p.id}</b><br>${p.municipio}, ${p.estado} · zona ${p.zona}<br>Área: ${fmt(p.area)} ha<br>`;
+  const cuerpo = p.conjunto === 'PREDICCION'
+    ? `<table class="popup-tabla">
+        <tr><td>Predicción oficial</td><td><b>${fmt(p.prediccion)} t/ha</b></td></tr>
+        <tr><td>Rango 80%</td><td>${fmt(p.int_inf)} – ${fmt(p.int_sup)}</td></tr>
+        <tr><td>QRF</td><td>${fmt(p.qrf_mediana)} ${p.coinciden ? '(coincide)' : '(difiere)'}</td></tr>
+        <tr><td>Promedio zona</td><td>${fmt(p.ref_zona)}</td></tr></table>`
+    : `Rendimiento real: <b>${fmt(p.rendimiento)} t/ha</b><br>Modelo (validación): ${fmt(p.pred_validacion)} t/ha`;
+  return cab + cuerpo + `<br><span class="popup-btn" onclick="verParcela('${p.id}')">Ver en explorador →</span>`;
+}
+const capas = {};
+const estilo = f => ({ color: '#fff', weight: 1.5, dashArray: f.properties.conjunto === 'PREDICCION' ? '4 3' : null,
+                       fillColor: color(valor(f.properties)), fillOpacity: .85 });
+const capa = L.geoJSON(D, {
+  style: estilo,
+  onEachFeature: (f, l) => {
+    const p = f.properties; capas[p.id] = l;
+    l.bindPopup(popupHtml(p));
+    l.on('mouseover', () => l.setStyle({ weight: 3, color: '#ffe082' }));
+    l.on('mouseout', () => capa.resetStyle(l));
+  }
+}).addTo(mapa);
+const puntos = L.layerGroup(F.map(f => {
+  const c = capas[f.properties.id].getBounds().getCenter();
+  return L.circleMarker(c, { radius: 5, color: '#fff', weight: 1, fillColor: color(valor(f.properties)), fillOpacity: .95 })
+    .on('click', () => { mapa.setView(c, 15); capas[f.properties.id].openPopup(); });
+}));
+function ajustarPuntos() { mapa.getZoom() < 13 ? puntos.addTo(mapa) : puntos.remove(); }
+mapa.on('zoomend', ajustarPuntos);
+mapa.fitBounds(capa.getBounds(), { padding: [20, 20] }); ajustarPuntos();
+
+let filtroConj = 'todas', filtroMun = '';
+const selMun = $('selMun');
+munis.forEach(m => selMun.insertAdjacentHTML('beforeend', `<option>${m}</option>`));
+function aplicarFiltros(reencuadrar = true) {
+  const vis = [];
+  F.forEach((f, i) => {
+    const p = f.properties, ok = (filtroConj === 'todas' || p.conjunto === filtroConj) && (!filtroMun || p.municipio === filtroMun);
+    const l = capas[p.id], pt = puntos.getLayers()[i];
+    pt.setStyle({ fillColor: color(valor(p)) });
+    if (ok) { vis.push(p); if (!mapa.hasLayer(l)) capa.addLayer(l); pt.setStyle({ opacity: 1, fillOpacity: .95 }); }
+    else { capa.removeLayer(l); pt.setStyle({ opacity: 0, fillOpacity: 0 }); }
+  });
+  capa.setStyle(estilo);
+  if (reencuadrar && vis.length) mapa.fitBounds(L.featureGroup(vis.map(p => capas[p.id])).getBounds(), { padding: [30, 30], maxZoom: 15 });
+  const v = vis.map(valor);
+  const nPred = vis.filter(p => p.conjunto === 'PREDICCION').length;
+  $('resumenMapa').innerHTML = vis.length ? `<b>${vis.length}</b> parcelas visibles<br>Promedio: <b>${fmt(prom(v))} t/ha</b><br>
+    Mínimo ${fmt(Math.min(...v))} · Máximo ${fmt(Math.max(...v))}<br>Superficie: ${fmt(vis.reduce((s, p) => s + p.area, 0), 1)} ha
+    ${nPred ? `<br><span class="nota">Parcelas a predecir con: ${NOMBRE_CRIT[criterio]}</span>` : ''}` : 'Sin parcelas con este filtro';
+}
+document.querySelectorAll('#segConjunto button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#segConjunto button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  filtroConj = b.dataset.v; aplicarFiltros();
+});
+selMun.onchange = () => { filtroMun = selMun.value; aplicarFiltros(); };
+$('selCriterio').onchange = e => { criterio = e.target.value; aplicarFiltros(false); };
+aplicarFiltros();
+
+/* ---------- Explorador ---------- */
+const selP = $('selParcela');
+P.forEach(p => selP.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.id} · ${p.municipio}${p.conjunto === 'PREDICCION' ? ' (a predecir)' : ''}</option>`));
+const promMunNdvi = {};
+munis.forEach(m => { const ps = P.filter(p => p.municipio === m);
+  promMunNdvi[m] = MESES.map((_, i) => { const v = ps.map(p => p.ndvi[i]).filter(x => x != null); return v.length ? prom(v) : null; }); });
+const chNdvi = new Chart($('chNdvi'), {
+  type: 'line',
+  data: { labels: MESES, datasets: [
+    { label: 'Parcela', data: [], borderColor: VERDE, backgroundColor: 'rgba(36,94,37,.12)', fill: true, tension: .35, borderWidth: 3, pointRadius: 3, spanGaps: true },
+    { label: 'Promedio del municipio', data: [], borderColor: '#b9a77e', borderDash: [6, 4], tension: .35, borderWidth: 2, pointRadius: 0, spanGaps: true } ] },
+  options: { maintainAspectRatio: false, scales: { y: { min: 0, max: .9, title: { display: true, text: 'NDVI' } }, x: { grid: { display: false } } },
+    plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(3) ?? '—'}` } } } }
+});
+
+/* rango dibujado en HTML: banda del intervalo, punto oficial y rombo QRF */
+function rangoHtml(p) {
+  const lo = Math.min(p.int_inf, p.qrf_p10) - .3, hi = Math.max(p.int_sup, p.qrf_p90) + .3;
+  const x = v => ((v - lo) / (hi - lo) * 100).toFixed(1) + '%';
+  return `<div class="rango"><div class="eje"></div>
+      <div class="banda" style="left:${x(p.int_inf)}; width:calc(${x(p.int_sup)} - ${x(p.int_inf)})"></div>
+      <div class="qrf" style="left:${x(p.qrf_mediana)}" title="QRF ${fmt(p.qrf_mediana)}"></div>
+      <div class="punto" style="left:${x(p.prediccion)}" title="Predicción ${fmt(p.prediccion)}"></div></div>
+    <div class="rango-num"><span>${fmt(p.int_inf)}</span><span>Rango probable ${INT.nivel}%</span><span>${fmt(p.int_sup)}</span></div>`;
+}
+/* desglose: promedio de las 138 parcelas + aporte de cada variable = predicción */
+function porqueHtml(p) {
+  const filas = [['Zona ' + p.zona.toLowerCase(), p.contrib.zona], ['Verdor histórico', p.contrib.historial], ['Tamaño parcela', p.contrib.area]];
+  const maxAbs = Math.max(.8, ...filas.map(f => Math.abs(f[1])));
+  const barra = v => { const w = Math.abs(v) / maxAbs * 50;
+    return `<div class="barra-c"><div class="centro"></div><div class="b" style="${v >= 0 ? `left:50%` : `left:${50 - w}%`}; width:${w}%; background:${v >= 0 ? VERDE : OCRE}"></div></div>`; };
+  return `<div class="etiqueta mt-3">¿Por qué este número?</div><div class="porque">
+    <div class="fila"><span>Promedio general</span><span></span><span class="val">${fmt(MOD.promedio_base)}</span></div>
+    ${filas.map(f => `<div class="fila"><span>${f[0]}</span>${barra(f[1])}<span class="val">${signo(f[1])}</span></div>`).join('')}
+    <div class="fila" style="border-top:1px solid var(--line)"><b>Predicción</b><span></span><b class="val">${fmt(p.prediccion)}</b></div></div>`;
+}
+function mostrarParcela(id) {
+  const p = P.find(x => x.id === id); selP.value = id;
+  const real = p.conjunto === 'ENTRENAMIENTO';
+  const nd = p.ndvi.filter(x => x != null), mx = nd.length ? Math.max(...nd) : null, mes = mx != null ? MESES[p.ndvi.indexOf(mx)] : '—';
+  if (real) {
+    $('fichaTipo').textContent = 'Rendimiento real 2025';
+    $('fichaRend').textContent = fmt(p.rendimiento) + ' t/ha';
+    $('fichaExtra').innerHTML = `<div class="nota mt-1">Sin conocer esta parcela, el modelo habría predicho <b>${fmt(p.pred_validacion)} t/ha</b>
+      (error ${signo(p.error_validacion)} t/ha).</div>`;
+  } else {
+    $('fichaTipo').innerHTML = `Predicción oficial 2025 · <span class="cat-${p.categoria}">${p.categoria}</span>`;
+    $('fichaRend').textContent = fmt(p.prediccion) + ' t/ha';
+    $('fichaExtra').innerHTML = rangoHtml(p) + `
+      <table class="mini-tabla">
+        <tr><td>① Modelo final (oficial)</td><td>${fmt(p.prediccion)}</td></tr>
+        <tr><td>② Rango probable ${INT.nivel}%</td><td>${fmt(p.int_inf)} – ${fmt(p.int_sup)}</td></tr>
+        <tr><td>③ Segunda opinión (QRF)</td><td>${fmt(p.qrf_mediana)} <span class="pill ${p.coinciden ? 'si' : 'no'}">${p.coinciden ? 'coincide' : 'difiere'}</span></td></tr>
+        <tr><td>Promedio real de su zona</td><td>${fmt(p.ref_zona)}</td></tr>
+      </table>` + porqueHtml(p);
+  }
+  $('fichaDatos').innerHTML = `
+    <dt>Municipio</dt><dd>${p.municipio}</dd><dt>Estado</dt><dd>${p.estado}</dd><dt>Zona</dt><dd>${p.zona}</dd>
+    <dt>Área</dt><dd>${fmt(p.area)} ha</dd>
+    <dt>Verdor histórico</dt><dd>${fmt(p.verdor.prom)} <span class="nota">(2022: ${fmt(p.verdor['2022'])} · 2023: ${fmt(p.verdor['2023'])} · 2024: ${fmt(p.verdor['2024'])})</span></dd>
+    <dt>NDVI máximo 2025</dt><dd>${fmt(mx, 3)} (${mes})</dd>
+    <dt>Prom. municipio</dt><dd>${fmt(p.ref_municipio)} t/ha <span class="nota">(${p.n_municipio} parcelas)</span></dd>
+    <dt>Producción est.</dt><dd>${fmt((real ? p.rendimiento : p.prediccion) * p.area, 1)} t</dd>`;
+  chNdvi.data.datasets[0].data = p.ndvi; chNdvi.data.datasets[1].data = promMunNdvi[p.municipio];
+  chNdvi.data.datasets[0].label = p.id; chNdvi.update();
+  $('notaNdvi').textContent = mx != null ? `El cultivo crece de junio a septiembre. Pico de ${p.id}: ${fmt(mx, 2)} en ${mes}.` : '';
+}
+selP.onchange = () => mostrarParcela(selP.value);
+window.verParcela = id => { mostrarParcela(id); $('explorador').scrollIntoView(); };
+mostrarParcela(pre[0].id);
+
+/* ---------- Predicciones: tres criterios ---------- */
+const d = INT.desplazamientos;
+$('criterios').innerHTML = `
+  <div class="card-c criterio"><span class="num">1</span><span class="etiqueta">Número oficial</span>
+    <h3>Predicción del modelo final</h3>
+    <p>Regresión lineal con zona, verdor histórico 2022–2024 y tamaño de la parcela. Es el número entregado a la convocatoria.
+      Error típico de ${fmt(MET.rmse)} t/ha; ${Math.round(MET.pct_05)}% de las parcelas validadas quedaron a ±0.5 t/ha.</p></div>
+  <div class="card-c criterio"><span class="num">2</span><span class="etiqueta">Incertidumbre</span>
+    <h3>Rango probable del ${INT.nivel}%</h3>
+    <p>Se arma con los errores reales del modelo en cada zona (norte ${signo(d.Norte[0])} / ${signo(d.Norte[1])}, sur ${signo(d.Sur[0])} / ${signo(d.Sur[1])} t/ha).
+      En validación contuvo el valor real en ${fmt(INT.cobertura, 0)}% de los casos (norte ${fmt(INT.cobertura_norte, 0)}%, sur ${fmt(INT.cobertura_sur, 0)}%).</p></div>
+  <div class="card-c criterio"><span class="num">3</span><span class="etiqueta">Segunda opinión</span>
+    <h3>Bosque por cuantiles (QRF)</h3>
+    <p>Un modelo de árboles independiente con las mismas variables (error ${fmt(QRF.rmse)} t/ha). Coincide con la oficial
+      (±${fmt(QRF.umbral)} t/ha) en ${Math.round(QRF.pct_coinciden)}% de los casos: el resultado no depende del tipo de modelo.
+      No se usa como alarma: cuando difiere, el error no fue mayor (${fmt(QRF.error_no_coinciden)} vs ${fmt(QRF.error_coinciden)} t/ha).</p></div>
+  <div class="card-c criterio sintesis"><span class="etiqueta" style="color:var(--white)">Lectura combinada</span>
+    <h3>Cómo usarlo para un crédito</h3>
+    <p>Estimar con la <b>predicción oficial</b>, evaluar capacidad de pago con el <b>escenario prudente</b> (límite inferior del rango)
+      y priorizar por <b>categoría</b>: bajo &lt; ${fmt(MOD.cortes_categoria[0], 1)}, medio, alto ≥ ${fmt(MOD.cortes_categoria[1], 1)} t/ha
+      (tercios del rendimiento real; acierto ${Math.round(MET.acierto_categoria)}%).</p></div>`;
+
+const filas = pre.map(p => ({ ...p, prod: p.prediccion * p.area }));
+let orden = { k: 'prediccion', asc: false };
+const ORDEN_CAT = { Bajo: 0, Medio: 1, Alto: 2 };
+function pintarTabla() {
+  const q = $('buscar').value.toLowerCase();
+  const key = p => orden.k === 'categoria' ? ORDEN_CAT[p.categoria] : p[orden.k];
+  const r = filas.filter(p => (p.id + p.municipio).toLowerCase().includes(q))
+    .sort((a, b) => (key(a) > key(b) ? 1 : -1) * (orden.asc ? 1 : -1));
+  document.querySelector('#tablaPred tbody').innerHTML = r.map(p => `<tr data-id="${p.id}">
+    <td>${p.id}</td><td>${p.municipio}</td><td>${fmt(p.area)}</td>
+    <td><span class="chip" style="background:${color(p.prediccion)}"></span><b>${fmt(p.prediccion)}</b></td>
+    <td>${fmt(p.int_inf)} – ${fmt(p.int_sup)}</td>
+    <td>${fmt(p.qrf_mediana)} <span class="pill ${p.coinciden ? 'si' : 'no'}">${p.coinciden ? '✓' : '≠'}</span></td>
+    <td class="cat-${p.categoria}">${p.categoria}</td><td>${fmt(p.prod, 1)}</td></tr>`).join('');
+}
+$('buscar').oninput = pintarTabla;
+document.querySelectorAll('#tablaPred th').forEach(th => th.onclick = () => {
+  orden = { k: th.dataset.k, asc: orden.k === th.dataset.k ? !orden.asc : true }; pintarTabla(); });
+document.querySelector('#tablaPred tbody').onclick = e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  $('mapa-sec').scrollIntoView();
+  const l = capas[tr.dataset.id]; mapa.fitBounds(l.getBounds(), { maxZoom: 16 }); setTimeout(() => l.openPopup(), 400);
+};
+$('btnCsv').onclick = () => {
+  const cab = 'ID_POLIGONO,MUNICIPIO,ZONA,AREA_HA,PREDICCION_T_HA,INTERVALO_80_INF,INTERVALO_80_SUP,QRF_MEDIANA,QRF_P10,QRF_P90,COINCIDEN,CATEGORIA,PRODUCCION_T\n';
+  const csv = cab + filas.map(p => [p.id, p.municipio, p.zona, p.area, p.prediccion.toFixed(3), p.int_inf.toFixed(3), p.int_sup.toFixed(3),
+    p.qrf_mediana.toFixed(3), p.qrf_p10.toFixed(3), p.qrf_p90.toFixed(3), p.coinciden ? 'si' : 'no', p.categoria, p.prod.toFixed(2)].join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+  a.download = 'predicciones_cebada_2025.csv'; a.click();
+};
+pintarTabla();
+
+/* gráfica de rangos por parcela */
+const ordenadas = [...pre].sort((a, b) => a.prediccion - b.prediccion);
+const colZona = p => p.zona === 'Norte' ? VERDE : OCRE;
+new Chart($('chRangos'), {
+  data: { labels: ordenadas.map(p => p.id), datasets: [
+    { type: 'bar', label: `Rango ${INT.nivel}%`, data: ordenadas.map(p => [p.int_inf, p.int_sup]),
+      backgroundColor: ordenadas.map(p => colZona(p) + '40'), borderRadius: 4, barPercentage: .9, categoryPercentage: 1 },
+    { type: 'line', label: 'Predicción oficial', data: ordenadas.map(p => p.prediccion), showLine: false,
+      pointRadius: 3.5, pointBackgroundColor: ordenadas.map(colZona), pointBorderColor: '#fff' },
+    { type: 'line', label: 'QRF', data: ordenadas.map(p => p.qrf_mediana), showLine: false, pointStyle: 'rectRot',
+      pointRadius: 3.5, pointBackgroundColor: '#fff', pointBorderColor: '#8a6d1f' } ] },
+  options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } },
+      tooltip: { callbacks: { title: c => { const p = ordenadas[c[0].dataIndex]; return `${p.id} · ${p.municipio}`; },
+        label: c => c.datasetIndex === 0 ? `Rango: ${fmt(c.raw[0])} – ${fmt(c.raw[1])}` : `${c.dataset.label}: ${fmt(c.parsed.y)} t/ha` } } },
+    scales: { x: { ticks: { display: false }, grid: { display: false }, title: { display: true, text: `${pre.length} parcelas, de menor a mayor predicción` } },
+      y: { title: { display: true, text: 't/ha' } } },
+    onClick: (e, els) => { if (els.length) verParcela(ordenadas[els[0].index].id); } }
+});
+
+/* ---------- Análisis ---------- */
+const M = D.modelos;
+const colModelo = m => m.modelo.startsWith('Regresión') ? VERDE : m.modelo.startsWith('Promedio por') || m.modelo === 'Promedio general' ? TER : SEC;
+new Chart($('chModelos'), {
+  type: 'bar', data: { labels: M.map(m => m.modelo), datasets: [{ data: M.map(m => m.RMSE), backgroundColor: M.map(colModelo), borderRadius: 6 }] },
+  options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+    tooltip: { callbacks: { label: c => { const m = M[c.dataIndex];
+      return [`RMSE ${fmt(m.RMSE, 3)} t/ha`, m.p_vs_final == null ? 'Modelo elegido' : `vs. modelo final: ${signo(m.dif_vs_final, 3)} (p ${fmtP(m.p_vs_final)})`]; } } } },
+    scales: { x: { min: 0, title: { display: true, text: 'RMSE (t/ha)' } }, y: { grid: { display: false } } } }
+});
+const ens = M.find(m => m.modelo.startsWith('Promedio regresión'));
+$('notaModelos').textContent = `Verde: modelo elegido · gris: líneas base. ${ens ? `Promediar regresión y QRF baja el error a ${fmt(ens.RMSE, 3)}, pero la diferencia no es comprobable (p ${fmtP(ens.p_vs_final)}); por simplicidad se mantiene la regresión.` : ''}`;
+const IMP = D.importancia;
+new Chart($('chImp'), {
+  type: 'bar', data: { labels: IMP.map(x => x.nombre), datasets: [{ data: IMP.map(x => x.aumento),
+    backgroundColor: IMP.map((_, i) => i === 0 ? VERDE : SEC), borderRadius: 6 }] },
+  options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+    tooltip: { callbacks: { label: c => `+${fmt(IMP[c.dataIndex].aumento, 3)} t/ha (p ${fmtP(IMP[c.dataIndex].p)})` } } },
+    scales: { x: { min: 0, title: { display: true, text: 'aumento del RMSE (t/ha)' } }, y: { grid: { display: false }, ticks: { callback: function (v) { const s = this.getLabelForValue(v); return s.length > 26 ? s.slice(0, 25) + '…' : s; } } } } }
+});
+const impZona = IMP.find(x => x.variable === 'zona_norte');
+$('notaImp').textContent = `Sin la zona, el error sube de ${fmt(MET.rmse, 3)} a ${fmt(MET.rmse + impZona.aumento, 3)} t/ha. ` +
+  `El verdor histórico y el área afinan la predicción dentro de cada zona, con aportes pequeños.`;
+
+const munEnt = munis.filter(m => ent.filter(p => p.municipio === m).length >= 3);
+const statsMun = munEnt.map(m => { const v = ent.filter(p => p.municipio === m).map(p => p.rendimiento); return { m, prom: prom(v), min: Math.min(...v), max: Math.max(...v), n: v.length }; })
+  .sort((a, b) => b.prom - a.prom);
+new Chart($('chReal'), {
+  type: 'bar', data: { labels: statsMun.map(s => s.m), datasets: [{ data: statsMun.map(s => s.prom),
+    backgroundColor: statsMun.map(s => color(s.prom)), borderRadius: 6 }] },
+  options: { maintainAspectRatio: false, plugins: { legend: { display: false },
+    tooltip: { callbacks: { label: c => { const s = statsMun[c.dataIndex]; return `${s.prom.toFixed(2)} t/ha (rango ${s.min}–${s.max}, ${s.n} parcelas)`; } } } },
+    scales: { y: { min: 0, title: { display: true, text: 't/ha' } }, x: { grid: { display: false } } } }
+});
+
+const RB = BON.respuestas, cz = MOD.coeficientes.zona_norte;
+$('conclusiones').innerHTML = `
+  <li><b>La ubicación domina.</b> Estar en el norte suma ${fmt(cz)} t/ha; sin la zona, el error sube a ${fmt(MET.rmse + impZona.aumento)} t/ha.</li>
+  <li><b>Modelo final:</b> zona + verdor acumulado histórico + área. Error de ${fmt(MET.rmse)} t/ha, R² de ${fmt(MET.r2)} y sin sobreajuste (R² de entrenamiento ${fmt(MET.r2_entrenamiento)}).</li>
+  <li><b>Rango del ${INT.nivel}%:</b> validado, contiene el valor real en ${Math.round(INT.cobertura)}% de los casos en ambas zonas.</li>
+  <li><b>Índice más importante:</b> ${RB.indice.nombre}, elegido en ${Math.round(RB.indice['seleccion_lasso_%'])}% de las particiones.</li>
+  <li><b>Clima:</b> ninguna de ${RB.clima.n_clima} variables mejora el modelo de forma comprobada una vez conocida la zona.</li>
+  <li><b>Dentro de cada zona</b> la información pública casi no distingue parcelas; las diferencias parecen venir del manejo de cada productor.</li>
+  <li><b>Recomendación para FIRA:</b> registrar fecha de siembra, variedad, productor y rendimiento medido de las parcelas financiadas.</li>`;
+
+/* ---------- Preguntas bonus ---------- */
+$('nCand').textContent = RB.n_candidatas;
+const corto = s => s.length > 24 ? s.slice(0, 23) + '…' : s;
+const comprob = (ok, p) => ok ? `mejora comprobada (p ${fmtP(p)})` : `mejora no comprobada (p ${fmtP(p)})`;
+
+$('respIndice').innerHTML = `<span class="r">${RB.indice.nombre}</span>
+  Lasso lo eligió en <b>${Math.round(RB.indice['seleccion_lasso_%'])}%</b> de las particiones compitiendo contra todas las variables;
+  ningún índice de 2025 pasó del ${Math.round(Math.max(...BON.indices.filter(x => !x.variable.startsWith('hist_')).map(x => x['seleccion_lasso_%'])))}%.
+  Sumado a zona + área baja el error ${fmt(Math.abs(RB.indice.aporte_RMSE), 3)} t/ha: ${comprob(RB.indice.comprobado, RB.indice.p)}.
+  Es el índice más útil, pero su aporte es pequeño frente a la zona.`;
+const IDX = BON.indices.slice(0, 8);
+new Chart($('chBonusIdx'), {
+  type: 'bar', data: { labels: IDX.map(x => x.nombre), datasets: [{ data: IDX.map(x => x['seleccion_lasso_%']),
+    backgroundColor: IDX.map((_, i) => i === 0 ? VERDE : SEC), borderRadius: 6 }] },
+  options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+    tooltip: { callbacks: { title: c => IDX[c[0].dataIndex].nombre,
+      label: c => { const x = IDX[c.dataIndex]; return [`Lasso: ${x['seleccion_lasso_%']}%`, `aporte sobre zona + área: ${signo(x.aporte_RMSE, 3)} t/ha (p ${fmtP(x.p)})`]; } } } },
+    scales: { x: { min: 0, max: 100, title: { display: true, text: '% de particiones' } },
+      y: { grid: { display: false }, ticks: { font: { size: 10 }, callback: function (v) { return corto(this.getLabelForValue(v)); } } } } }
+});
+
+const eng = RB.clima.engañosa;
+$('respClima').innerHTML = `<span class="r">${RB.clima.nombre}</span>
+  Es la que Lasso elige más (${Math.round(RB.clima['seleccion_lasso_%'])}% de las particiones), pero ${comprob(RB.clima.comprobado, RB.clima.p)}.
+  <b>Ninguna de las ${RB.clima.n_clima}</b> variables de clima mejora el modelo de forma comprobada. Ojo: <i>${eng.nombre}</i>
+  explica ${Math.round(eng.R2_sola * 100)}% del rendimiento por sí sola, pero solo porque llueve distinto en el norte y en el sur; conocida la zona, no agrega nada.`;
+const R2B = RB.base.R2;
+const CLI = [...BON.clima].sort((a, b) => b.R2_sola - a.R2_sola).slice(0, 7);
+new Chart($('chBonusClima'), {
+  type: 'bar', data: { labels: CLI.map(x => x.nombre), datasets: [
+    { label: 'Explica por sí sola', data: CLI.map(x => Math.max(0, x.R2_sola)), backgroundColor: TER, borderRadius: 4 },
+    { label: 'Agrega a zona + área', data: CLI.map(x => Math.max(0, x.R2_con_base - R2B)), backgroundColor: VERDE, borderRadius: 4 } ] },
+  options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } },
+    tooltip: { callbacks: { title: c => CLI[c[0].dataIndex].nombre, label: c => `${c.dataset.label}: R² ${fmt(c.parsed.x, 3)}` } } },
+    scales: { x: { min: 0, title: { display: true, text: 'R² (fuera de muestra)' } },
+      y: { grid: { display: false }, ticks: { font: { size: 10 }, callback: function (v) { return corto(this.getLabelForValue(v)); } } } } }
+});
+
+const maxAgrega = Math.max(...BON.clima.map(x => x.R2_con_base - R2B));
+$('notaClima').textContent = `Las barras verdes casi no se ven: conocida la zona, ninguna variable de clima agrega más de ${fmt(Math.max(0, maxAgrega), 3)} de R².`;
+
+const CB = BON.combinaciones;
+const menor = [...CB].sort((a, b) => a.RMSE - b.RMSE)[0];
+$('respComb').innerHTML = `<span class="r">${RB.combinacion.nombre}</span>
+  Con ${fmt(RB.combinacion.RMSE, 3)} t/ha de error y R² ${fmt(RB.combinacion.R2)}.
+  ${menor.p_vs_final != null
+    ? `La combinación con menor error (${menor['combinación']}, ${fmt(menor.RMSE, 3)}) no supera al modelo final de forma comprobada (p ${fmtP(menor.p_vs_final)}), así que preferimos la más simple.`
+    : `Es la de menor error entre las ${CB.length} combinaciones probadas: agregar clima, índices de 2025 o relieve no la mejora.`}
+  Usar todas las variables empeora el error a ${fmt(RB.lasso_todas.RMSE, 3)} t/ha (p ${fmtP(RB.lasso_todas.p_vs_final)}).`;
+new Chart($('chBonusComb'), {
+  type: 'bar', data: { labels: CB.map(x => x['combinación']), datasets: [{ data: CB.map(x => x.RMSE),
+    backgroundColor: CB.map(x => x['combinación'] === RB.combinacion.nombre ? VERDE : x['combinación'].startsWith('Todas') ? OCRE : SEC), borderRadius: 6 }] },
+  options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+    tooltip: { callbacks: { title: c => CB[c[0].dataIndex]['combinación'],
+      label: c => { const x = CB[c.dataIndex]; return [`RMSE ${fmt(x.RMSE, 3)} t/ha · ${x.n_variables} variables`,
+        x.p_vs_final == null ? 'Modelo final' : `vs. final: ${signo(x.dif_vs_final, 3)} (p ${fmtP(x.p_vs_final)})`]; } } } },
+    scales: { x: { min: 0.4, title: { display: true, text: 'RMSE (t/ha)' } },
+      y: { grid: { display: false }, ticks: { font: { size: 10 }, callback: function (v) { return corto(this.getLabelForValue(v)); } } } } }
+});
+
+/* resaltar sección activa en el menú */
+const links = document.querySelectorAll('.nav-links a');
+const obs = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) links.forEach(a => a.classList.toggle('activo', a.getAttribute('href') === '#' + e.target.id));
+}), { rootMargin: '-45% 0px -50% 0px' });
+document.querySelectorAll('section').forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
