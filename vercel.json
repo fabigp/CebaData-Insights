@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
+  "rewrites": [
+    { "source": "/", "destination": "/web/index.html" },
+    { "source": "/datos_parcelas.js", "destination": "/web/datos_parcelas.js" }
+  ]
+}

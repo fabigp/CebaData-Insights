@@ -1,0 +1,6 @@
+# Código de Python: queda en GitHub para consulta, pero no se publica en el sitio
+src
+datos_entrada
+resultados
+*.py
+requirements.txt
